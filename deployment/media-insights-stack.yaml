@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Media Insights Engine - Base AWS CloudFormation template that provisions the core Media Insights Engine services and provides parameters for enabling additional functionality.
 
 Parameters:
+  LiveStreamBucket:
+    Description: Live Stream Video Segment S3 Bucket
+    Type: String
+    Default: mie-test-input
+
   AdminEmail:
     Description: Email address for the MIE Administrator
     Type: String
@@ -1463,7 +1468,33 @@ Resources:
         IdentityPoolId: !Ref MieIdentityPool
         AwsRegion: !Ref "AWS::Region"
         PoolClientId: !Ref MieWebAppClient
+  
+  LiveStreamInputLambda:
+    DependsOn:
+      - StringFunctions
+      - Analytics
+      - MediaInsightsWorkflowApi
+      - MediaInsightsDataplaneApiStack
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL:
+        !Join [
+          "/",
+          [
+            "https://s3.amazonaws.com",
+            !FindInMap ["SourceCode", "General", "S3Bucket"],
+            !FindInMap ["SourceCode", "General", "TemplateKeyPrefix"],
+            "media-insights-livestream.template",
+          ],
+        ]
+      Parameters:
+        LiveStreamBucket: !Ref LiveStreamBucket #existing live stream s3 bucket
+        WorkflowEndpoint: !GetAtt MediaInsightsWorkflowApi.Outputs.EndpointURL
+        UserPoolId: !Ref MieUserPool
+        IdentityPoolId: !Ref MieIdentityPool
+        AwsRegion: !Ref "AWS::Region"
 
+  
 #  TranscriberWebApp:
 #    Condition: DeployTranscriberApp
 #    DependsOn:
@@ -1544,3 +1575,4 @@ Outputs:
   AdminUsername:
     Description: Username of the default MIE admin
     Value: !Ref AdminEmail
+ 
