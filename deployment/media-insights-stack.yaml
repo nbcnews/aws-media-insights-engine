@@ -1137,6 +1137,7 @@ Resources:
       Parameters:
         DataplaneTableName: !Ref DataplaneTable
         DataplaneBucketName: !Ref Dataplane
+        LiveStreamBucketName: !Ref LiveStreamBucket
         UserPoolArn: !GetAtt MieUserPool.Arn
         DeploymentPackageBucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
         DeploymentPackageKey:
@@ -1491,8 +1492,9 @@ Resources:
         LiveStreamBucket: !Ref LiveStreamBucket #existing live stream s3 bucket
         WorkflowEndpoint: !GetAtt MediaInsightsWorkflowApi.Outputs.EndpointURL
         UserPoolId: !Ref MieUserPool
-        IdentityPoolId: !Ref MieIdentityPool
+        PoolClientId: !Ref MieAdminClient
         AwsRegion: !Ref "AWS::Region"
+
 
   
 #  TranscriberWebApp:

@@ -8,8 +8,14 @@ Parameters:
     Type: String
   UserPoolId:
     Type: String
-  IdentityPoolId:
+  PoolClientId:
     Type: String
+  UserName:
+    Type: String
+    Default: weisong.wang@nbcuni.com
+  UserPwd:
+    Type: String
+    Default: Password00!
   AwsRegion:
     Type: String
 
@@ -67,8 +73,10 @@ Resources:
         Variables:
           WorkflowEndpoint: !Ref WorkflowEndpoint
           UserPoolId: !Ref UserPoolId
-          IdentityPoolId: !Ref IdentityPoolId
+          PoolClientId: !Ref PoolClientId
           AwsRegion: !Ref AwsRegion
+          UserName: !Ref UserName
+          UserPwd: !Ref UserPwd
           
   LiveStreamInputLambdaRole:
     Type: 'AWS::IAM::Role'
@@ -87,6 +95,10 @@ Resources:
           PolicyDocument:
             Version: 2012-10-17
             Statement:
+              - Effect: Allow
+                Action:
+                  - 'cognito-idp:AdminInitiateAuth'
+                Resource: '*'
               - Effect: Allow
                 Action:
                   - 's3:GetBucketNotification'

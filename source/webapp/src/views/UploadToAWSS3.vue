@@ -613,7 +613,6 @@ export default {
       if (this.invalidFileMessages.length === 0) this.showInvalidFile = false;
     },
     runWorkflow: async function(location) {
-      console.log({location});
       const token = await this.$Amplify.Auth.currentSession().then(data => {
         return data.getIdToken().getJwtToken();
       });
@@ -747,7 +746,7 @@ export default {
           vm.s3UploadError("Unsupported media type: " + media_type + ".");
         }
       }
-      console.log(JSON.stringify(data));
+      //console.log(JSON.stringify(data));
       fetch(this.WORKFLOW_API_ENDPOINT + "workflow/execution", {
         method: "post",
         body: JSON.stringify(data),
@@ -849,7 +848,7 @@ export default {
       }, poll_frequency);
     },
     uploadFiles() {
-      console.log("Uploading to s3://" + this.DATAPLANE_BUCKET,);
+      //console.log("Uploading to s3://" + this.DATAPLANE_BUCKET,);
       const signurl = this.DATAPLANE_API_ENDPOINT + "/upload";
       this.$refs.myVueDropzone.setAWSSigningURL(signurl);
       this.$refs.myVueDropzone.processQueue();
