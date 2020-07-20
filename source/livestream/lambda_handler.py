@@ -4,6 +4,7 @@ import logging
 import sys
 import requests
 import json
+import urllib.parse
 
 MIE_POOL_ID = str(os.environ['UserPoolId'])
 MIE_CLIENT_ID = str(os.environ['PoolClientId'])
@@ -14,10 +15,12 @@ MIE_WORKFLOW_ENDPOINT = str(os.environ['WorkflowEndpoint'])
 
 def lambda_handler(event, context):
     s3 = event['Records'][0]['s3']
-    config = workflow_config(s3['bucket']['name'], s3['object']['key'])
+    key = urllib.parse.unquote_plus(s3['object']['key'])
+    config = workflow_config(s3['bucket']['name'], key)
     try:
         token = authenticate_and_get_token(MIE_USER_NAME, MIE_USER_PWD, MIE_POOL_ID, MIE_CLIENT_ID)
         run_workflow(config, token)
+        logging.info(f'workflow kicked off for: {key}')
     except Exception as e:
         logging.error(f'failed to process message {s3}: {e}')
         raise e
@@ -70,10 +73,10 @@ def workflow_config(bucket: str, key: str) -> dict:
                         'Enabled': True
                     },
                     'technicalCueDetection': {
-                        'Enabled': True
+                        'Enabled': False
                     },
                     'shotDetection': {
-                        'Enabled': True
+                        'Enabled': False
                     },
                     'celebrityRecognition': {
                         'Enabled': True

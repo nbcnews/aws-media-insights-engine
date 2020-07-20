@@ -162,7 +162,7 @@ Resources:
                           'LambdaFunctionArn': LambdaArn,
                           'Id': 'LiveStremNoti',
                           'Events': [
-                              's3:ObjectCreated:Put'
+                              's3:ObjectCreated:*'
                           ],
                           'Filter': {
                               'Key': {
