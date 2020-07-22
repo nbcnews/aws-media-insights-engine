@@ -198,6 +198,7 @@ cp "$workflows_dir/MieCompleteWorkflow.yaml" "$dist_dir/MieCompleteWorkflow.temp
 cp "$source_dir/consumers/elastic/media-insights-elasticsearch.yaml" "$dist_dir/media-insights-elasticsearch.template"
 cp "$source_dir/consumers/elastic/media-insights-elasticsearch.yaml" "$dist_dir/media-insights-s3.template"
 cp "$webapp_dir/media-insights-webapp.yaml" "$dist_dir/media-insights-webapp.template"
+cp "$source_dir/livestream/media-insights-livestream.yaml" "$dist_dir/media-insights-livestream.template"
 find "$dist_dir"
 echo "Updating code source bucket in template files with '$bucket'"
 echo "Updating solution version in template files with '$version'"
@@ -218,6 +219,9 @@ sed -i.orig -e "$new_bucket" "$dist_dir/media-insights-s3.template"
 sed -i.orig -e "$new_version" "$dist_dir/media-insights-s3.template"
 sed -i.orig -e "$new_bucket" "$dist_dir/media-insights-webapp.template"
 sed -i.orig -e "$new_version" "$dist_dir/media-insights-webapp.template"
+sed -i.orig -e "$new_bucket" "$dist_dir/media-insights-livestream.template"
+sed -i.orig -e "$new_version" "$dist_dir/media-insights-livestream.template"
+
 
 echo "------------------------------------------------------------------------------"
 echo "Operators"
@@ -690,6 +694,41 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 rm -f ./dist
+
+echo "------------------------------------------------------------------------------"
+echo "Live Stream Input Lambda Function"
+echo "------------------------------------------------------------------------------"
+
+echo "Building Live Stream Input Lambda function"
+cd "$source_dir/livestream" || exit 1
+
+[ -e dist ] && rm -r dist
+mkdir -p dist
+[ -e package ] && rm -r package
+mkdir -p package
+echo "preparing packages from requirements.txt"
+# Package dependencies listed in requirements.txt
+pushd package || exit 1
+# Handle distutils install errors with setup.cfg
+touch ./setup.cfg
+echo "[install]" > ./setup.cfg
+echo "prefix= " >> ./setup.cfg
+# Try and handle failure if pip version mismatch
+if [ -x "$(command -v pip)" ]; then
+  pip install --quiet -r ../requirements.txt --target .
+elif [ -x "$(command -v pip3)" ]; then
+  echo "pip not found, trying with pip3"
+  pip3 install --quiet -r ../requirements.txt --target .
+elif ! [ -x "$(command -v pip)" ] && ! [ -x "$(command -v pip3)" ]; then
+  echo "No version of pip installed. This script requires pip. Cleaning up and exiting."
+  exit 1
+fi
+zip -q -r9 ../dist/livestreaminput.zip .
+popd || exit 1
+
+zip -q -g dist/livestreaminput.zip ./*.py
+cp "./dist/livestreaminput.zip" "$dist_dir/livestreaminput.zip"
+rm -f ./dist ./package
 
 echo "------------------------------------------------------------------------------"
 echo "Demo website stack"

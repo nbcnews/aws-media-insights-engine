@@ -339,7 +339,7 @@ def create_asset():
 
     # build key for new s3 object
 
-    new_key = directory + 'input' + '/' + source_key
+    new_key = directory + 'input' + '/' + source_key.split('/')[-1]
 
     # Move input media into newly created dataplane s3 directory.
 
@@ -351,10 +351,11 @@ def create_asset():
             CopySource={'Bucket': source_bucket, 'Key': source_key}
         )
         # remove input media from upload/
-        s3_client.delete_object(
-            Bucket=source_bucket,
-            Key=source_key
-        )
+        if source_bucket == dataplane_s3_bucket:
+            s3_client.delete_object(
+                Bucket=source_bucket,
+                Key=source_key
+            )
     except ClientError as e:
         error = e.response['Error']['Message']
         logger.error("Exception occurred during asset creation: {e}".format(e=error))

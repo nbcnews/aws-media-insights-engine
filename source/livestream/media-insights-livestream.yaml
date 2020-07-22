@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Media Insights Engine - live stream video segments input from s3
+
+Parameters:
+  LiveStreamBucket:
+    Type: String
+  WorkflowEndpoint:
+    Type: String
+  UserPoolId:
+    Type: String
+  PoolClientId:
+    Type: String
+  UserName:
+    Type: String
+    Default: weisong.wang@nbcuni.com
+  UserPwd:
+    Type: String
+    Default: Password00!
+  AwsRegion:
+    Type: String
+
+Mappings:
+  SourceCode:
+        General:
+            S3Bucket: '%%BUCKET_NAME%%'
+            KeyPrefix: "media-insights-solution/%%VERSION%%/code"
+
+Resources:
+  # Create new LiveStreamBucket
+  # LiveStreamS3:
+  #   Type: AWS::S3::Bucket
+  #   DependsOn: LiveStreamInputLambdaPermission
+  #   Properties:
+  #     BucketName: !Ref LiveStreamBucket
+  #     NotificationConfiguration:
+  #       LambdaConfigurations:
+  #         - Event: s3:ObjectCreated:Put
+  #           Filter:
+  #             S3Key:
+  #               Rules:
+  #                 - Name: suffix
+  #                   Value: mp4
+  #           Function: !GetAtt [ LiveStreamInputLambda, Arn]
+
+  LiveStreamInputLambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    DependsOn: LiveStreamInputLambda
+    Properties:
+      FunctionName: !GetAtt LiveStreamInputLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub 'arn:aws:s3:::${LiveStreamBucket}'
+
+  LiveStreamInputLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        S3Bucket: !FindInMap ["SourceCode", "General", "S3Bucket"]
+        S3Key:
+          !Join [
+            "/",
+            [
+              !FindInMap ["SourceCode", "General", "KeyPrefix"],
+              "livestreaminput.zip",
+            ],
+          ]
+      Handler: "lambda_handler.lambda_handler"
+      Role: !GetAtt LiveStreamInputLambdaRole.Arn
+      Runtime: "python3.7"
+      Timeout: 900
+      MemorySize: 512
+      Environment:
+        Variables:
+          WorkflowEndpoint: !Ref WorkflowEndpoint
+          UserPoolId: !Ref UserPoolId
+          PoolClientId: !Ref PoolClientId
+          AwsRegion: !Ref AwsRegion
+          UserName: !Ref UserName
+          UserPwd: !Ref UserPwd
+          
+  LiveStreamInputLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-LiveStreamInputLambdaAccess"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'cognito-idp:AdminInitiateAuth'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetBucketNotification'
+                  - 's3:PutBucketNotification'
+                Resource: !Sub 'arn:aws:s3:::${LiveStreamBucket}'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+
+  CustomResourceLambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt LiveStreamInputLambdaRole.Arn
+      Code:
+        ZipFile: |
+
+            from __future__ import print_function
+            import json
+            import boto3
+            import cfnresponse
+            
+            SUCCESS = "SUCCESS"
+            FAILED = "FAILED"
+            
+            print('Loading function')
+            s3 = boto3.resource('s3')
+            
+            def lambda_handler(event, context):
+                print("Received event: " + json.dumps(event, indent=2))
+                responseData={}
+                try:
+                    if event['RequestType'] == 'Delete':
+                        print("Request Type:",event['RequestType'])
+                        Bucket=event['ResourceProperties']['Bucket']
+                        delete_notification(Bucket)
+                        print("Sending response to custom resource after Delete")
+                    elif event['RequestType'] == 'Create' or event['RequestType'] == 'Update':
+                        print("Request Type:",event['RequestType'])
+                        LambdaArn=event['ResourceProperties']['LambdaArn']
+                        Bucket=event['ResourceProperties']['Bucket']
+                        add_notification(LambdaArn, Bucket)
+                        responseData={'Bucket':Bucket}
+                        print("Sending response to custom resource")
+                    responseStatus = 'SUCCESS'
+                except Exception as e:
+                    print('Failed to process:', e)
+                    responseStatus = 'FAILURE'
+                    responseData = {'Failure': 'Something bad happened.'}
+                cfnresponse.send(event, context, responseStatus, responseData)
+
+            def add_notification(LambdaArn, Bucket):
+                bucket_notification = s3.BucketNotification(Bucket)
+                response = bucket_notification.put(
+                  NotificationConfiguration={
+                    'LambdaFunctionConfigurations': [
+                      {
+                          'LambdaFunctionArn': LambdaArn,
+                          'Id': 'LiveStremNoti',
+                          'Events': [
+                              's3:ObjectCreated:*'
+                          ],
+                          'Filter': {
+                              'Key': {
+                                  'FilterRules': [
+                                      {
+                                        'Name': 'suffix',
+                                        'Value': 'mp4'
+                                      }
+                                  ]
+                              }
+                          }
+                      }
+                    ]
+                  }
+                )
+                print("Put request completed....")
+              
+            def delete_notification(Bucket):
+                bucket_notification = s3.BucketNotification(Bucket)
+                response = bucket_notification.put(
+                    NotificationConfiguration={}
+                )
+                print("Delete request completed....")
+      Runtime: python3.7
+      Timeout: 50
+
+  LambdaTrigger:
+    Type: 'Custom::LambdaTrigger'
+    DependsOn: LiveStreamInputLambdaPermission
+    Properties:
+      ServiceToken: !GetAtt CustomResourceLambdaFunction.Arn
+      LambdaArn: !GetAtt LiveStreamInputLambda.Arn
+      Bucket: !Ref LiveStreamBucket

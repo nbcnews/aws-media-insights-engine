@@ -8,6 +8,10 @@
       "Type": "String",
       "Description": "Bucket used to store asset media"
     },
+    "LiveStreamBucketName": {
+      "Type": "String",
+      "Description": "Bucket contains the live stream segments"
+    },
     "UserPoolArn": {
       "Type": "String",
       "Description": "Arn of the Mie Cognito user pool"
@@ -45,6 +49,19 @@
                     "s3:DeleteObjectVersion"
                   ],
                   "Resource": {"Fn::Sub": "arn:aws:s3:::${DataplaneBucketName}/*"}
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:ReplicateObject",
+                    "s3:GetObject",
+                    "s3:RestoreObject",
+                    "s3:GetObjectVersionAcl",
+                    "s3:ListBucket",
+                    "s3:HeadBucket",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": {"Fn::Sub": "arn:aws:s3:::${LiveStreamBucketName}/*"}
                 },
                 {
                   "Effect": "Allow",
